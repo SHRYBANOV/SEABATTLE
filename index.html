@@ -33,7 +33,7 @@
     .info-box .label { font-size: 0.6em; color: #00aa2a; }
     .info-box .value { font-size: 1.3em; font-weight: bold; }
 
-    /* ─── РАДАРНЫЙ ЭКРАН (Прямоугольный, во всю ширину) ─── */
+    /* ─── РАДАРНЫЙ ЭКРАН ─── */
     .radar-screen {
       background: #051018;
       border: 2px solid #00ff41;
@@ -57,7 +57,6 @@
       font-size: 0.65em; color: #00ff41; font-weight: bold; 
     }
 
-    /* УВЕЛИЧЕННЫЕ КЛЕТКИ С УДОБНЫМ ТАП-ЗОНОМ */
     .cell {
       aspect-ratio: 1;
       background: rgba(0, 80, 160, 0.4);
@@ -68,7 +67,6 @@
 
     .cell:active { background: rgba(0, 255, 65, 0.5); }
 
-    /* Обозначения выстрелов */
     .cell.miss::after { 
       content: '•'; position: absolute; top: 50%; left: 50%; 
       transform: translate(-50%, -50%); color: #00aa2a; font-size: 1.2em; 
@@ -110,13 +108,22 @@
     .ship-segment { width: 7px; height: 7px; background: #00ff41; border-radius: 1px; }
     .ship-indicator.destroyed { opacity: 0.2; }
 
-    .start-screen { text-align: center; padding: 40px 10px; }
+    .start-screen { text-align: center; padding: 30px 10px; }
     .start-screen input { 
       background: transparent; border: none; border-bottom: 2px solid #00ff41; 
       color: #00ff41; font-family: 'Courier New', monospace; font-size: 1.1em; 
       padding: 8px; text-align: center; width: 85%; outline: none; margin-bottom: 20px; 
       -webkit-user-select: auto; user-select: auto; 
     }
+
+    /* Таблица рекордов */
+    .scores-table {
+      width: 100%; border-collapse: collapse; font-size: 0.75em; margin-top: 10px;
+      background: rgba(0, 255, 65, 0.05); border: 1px solid #00ff41;
+    }
+    .scores-table th { border-bottom: 1px solid #00ff41; padding: 6px; color: #00aa2a; text-align: left; }
+    .scores-table td { padding: 6px; border-bottom: 1px solid rgba(0, 255, 65, 0.1); text-align: left; }
+    .scores-table tr:first-child td { color: #ffaa00; font-weight: bold; }
   </style>
 </head>
 <body>
@@ -143,7 +150,6 @@
       <div class="fleet-status" id="fleetStatus"></div>
       <div class="message-bar" id="messageBar">Жми на квадрат для выстрела! 🎯</div>
       
-      <!-- Полноэкранная матрица без круга -->
       <div class="radar-screen">
         <div class="board" id="gameBoard"></div>
       </div>
@@ -156,24 +162,71 @@
   </div>
 
   <script>
+    // ─── АУДИО И МУЗЫКАЛЬНЫЙ ДВИЖОК ───
     class SoundEngine {
       constructor() { this.ctx = null; }
       init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+      
       play(type) {
-        if (this.ctx) {
-          try {
-            const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
-            osc.connect(gain); gain.connect(this.ctx.destination);
-            if (type === 'miss') { osc.frequency.value = 150; gain.gain.value = 0.1; osc.start(); osc.stop(this.ctx.currentTime + 0.1); }
-            else if (type === 'hit') { osc.frequency.value = 500; gain.gain.value = 0.2; osc.start(); osc.stop(this.ctx.currentTime + 0.15); }
-            else if (type === 'sunk') { osc.frequency.value = 250; gain.gain.value = 0.3; osc.start(); osc.stop(this.ctx.currentTime + 0.3); }
-          } catch(e){}
+        if (!this.ctx) return;
+
+        if (type === 'miss') {
+          const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.frequency.value = 150; gain.gain.value = 0.1; 
+          osc.start(); osc.stop(this.ctx.currentTime + 0.1);
+        } else if (type === 'hit') {
+          const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.frequency.value = 500; gain.gain.value = 0.2; 
+          osc.start(); osc.stop(this.ctx.currentTime + 0.15);
+        } else if (type === 'sunk') {
+          const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          osc.frequency.value = 250; gain.gain.value = 0.3; 
+          osc.start(); osc.stop(this.ctx.currentTime + 0.3);
+        } 
+        // 🎺 ПОБЕДНАЯ МЕЛОДИЯ (8-bit Fanfare)
+        else if (type === 'win') {
+          const notes = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50]; // C5, E5, G5, C6, G5, C6
+          notes.forEach((freq, idx) => {
+            setTimeout(() => {
+              try {
+                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+                o.connect(g); g.connect(this.ctx.destination);
+                o.type = 'square'; o.frequency.value = freq;
+                g.gain.setValueAtTime(0.15, this.ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.2);
+                o.start(); o.stop(this.ctx.currentTime + 0.2);
+              } catch(e){}
+            }, idx * 120);
+          });
+        } 
+        // 💥 МЕЛОДИЯ ПРОИГРЫША (Game Over)
+        else if (type === 'lose') {
+          const notes = [400, 350, 300, 220]; // Нисходящий гул
+          notes.forEach((freq, idx) => {
+            setTimeout(() => {
+              try {
+                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+                o.connect(g); g.connect(this.ctx.destination);
+                o.type = 'sawtooth'; o.frequency.value = freq;
+                g.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.3);
+                o.start(); o.stop(this.ctx.currentTime + 0.3);
+              } catch(e){}
+            }, idx * 180);
+          });
         }
+
+        // Вибрация
         if (navigator.vibrate) {
           try {
             if (type === 'miss') navigator.vibrate(25);
             else if (type === 'hit') navigator.vibrate([40, 30, 40]);
             else if (type === 'sunk') navigator.vibrate([100, 50, 100]);
+            else if (type === 'win') navigator.vibrate([100, 50, 100, 50, 200]);
+            else if (type === 'lose') navigator.vibrate([200, 100, 200]);
           } catch(e){}
         }
       }
@@ -202,7 +255,6 @@
       }
     }
 
-    // Делегирование событий касания для мгновенного отклика
     document.addEventListener('DOMContentLoaded', () => {
       const board = document.getElementById('gameBoard');
       
@@ -244,7 +296,6 @@
       setMessage(`Капитан ${name}, огонь по цели! 🎯`);
     }
 
-    // Алгоритм расстановки кораблей без зависаний
     function generateShips() {
       const sizes = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1];
       let grid, success = false;
@@ -289,7 +340,7 @@
         
         for (let dr = -1; dr <= 1; dr++) {
           for (let dc = -1; dc <= 1; dc++) {
-            const nr = currR + dr, nc = currC + dc;
+            const nr = currR + dr, nc = c + dc;
             if (nr >= 0 && nr < 10 && nc >= 0 && nc < 10 && grid[nr][nc] !== 0) return false;
           }
         }
@@ -329,7 +380,6 @@
           sound.play('sunk');
           setMessage("ПОТОПЛЕН! 💀");
           
-          // Автоматическая обводка сбитого корабля
           shipCells.forEach(s => {
             for (let di = -1; di <= 1; di++) {
               for (let dj = -1; dj <= 1; dj++) {
@@ -355,13 +405,16 @@
         setMessage("МИМО... 💨");
       }
 
+      // ПРОВЕРКА ПОБЕДЫ ИЛИ ПРОИГРЫША
       if (destroyedShips.size === 10) { 
         localGame.status = 'won'; 
         setMessage("🎉 ПОБЕДА! Все корабли уничтожены!"); 
+        sound.play('win');
         finishGame(); 
       } else if (localGame.shots >= localGame.maxShots) { 
         localGame.status = 'lost'; 
         setMessage("💥 ВЫСТРЕЛЫ ЗАКОНЧИЛИСЬ!"); 
+        sound.play('lose');
         reveal(); 
         finishGame(); 
       }
@@ -370,7 +423,21 @@
       updateFleetStatus();
     }
 
+    // ─── СОХРАНЕНИЕ РЕКОРДОВ (В ПАМЯТЬ ТЕЛЕФОНА + BTP) ───
     function finishGame() {
+      // 1. Сохранение локально на смартфоне
+      let scores = JSON.parse(localStorage.getItem('seabattle_scores') || '[]');
+      scores.push({
+        name: localGame.name,
+        score: localGame.score,
+        shots: localGame.shots
+      });
+      // Сортировка по очкам (по убыванию)
+      scores.sort((a, b) => b.score - a.score);
+      scores = scores.slice(0, 10); // Хранить только ТОП-10
+      localStorage.setItem('seabattle_scores', JSON.stringify(scores));
+
+      // 2. Попытка отправить на BTP Сервер (если подключен)
       const id = 'id' + Date.now();
       fetch('/api/HighScores', {
         method: 'POST', 
@@ -413,17 +480,47 @@
       localGame = null; 
     }
     
+    // ─── ОТОБРАЖЕНИЕ РЕКОРДОВ ───
     async function showScores() {
       const container = document.getElementById('scoresContainer');
-      container.innerHTML = '<p style="text-align:center; padding:10px;">Загрузка...</p>';
+      
+      // Сначала загружаем из памяти телефона
+      let scores = JSON.parse(localStorage.getItem('seabattle_scores') || '[]');
+
+      // Попытка получить с BTP
       try {
-        const res = await fetch('/api/HighScores?$orderby=score desc&$top=5');
+        const res = await fetch('/api/HighScores?$orderby=score desc&$top=10');
         const data = await res.json();
         if (data.value && data.value.length) {
-          container.innerHTML = `<table style="width:100%; font-size:0.75em; margin-top:10px; border-collapse:collapse;">` + 
-            data.value.map((s, i) => `<tr style="border-bottom:1px solid rgba(0,255,65,0.1);"><td style="padding:4px">${i+1}. ${s.playerName}</td><td style="padding:4px; text-align:right">${s.score} очков</td></tr>`).join('') + `</table>`;
-        } else container.innerHTML = '<p style="text-align:center; padding:10px;">Рекордов пока нет</p>';
-      } catch { container.innerHTML = '<p style="text-align:center; padding:10px;">Сервер не подключен</p>'; }
+          scores = data.value.map(s => ({ name: s.playerName, score: s.score, shots: s.shots }));
+        }
+      } catch(e){}
+
+      if (scores.length > 0) {
+        container.innerHTML = `
+          <table class="scores-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>ИМЯ</th>
+                <th>ОЧКИ</th>
+                <th>ВЫСТРЕЛЫ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${scores.map((s, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${s.name}</td>
+                  <td>${s.score}</td>
+                  <td>${s.shots}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>`;
+      } else {
+        container.innerHTML = '<p style="text-align:center; padding:10px;">Пока нет рекордов. Сыграйте первую игру!</p>';
+      }
     }
   </script>
 </body>
