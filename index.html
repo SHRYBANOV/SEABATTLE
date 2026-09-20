@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>⚓ Морской Бой</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    
+    body {
+      background: #0a1628;
+      font-family: 'Courier New', monospace;
+      color: #00ff41;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Эффект CRT Монитора */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 255, 65, 0.03) 0px,
+        rgba(0, 255, 65, 0.03) 1px,
+        transparent 1px,
+        transparent 3px
+      );
+      pointer-events: none;
+      z-index: 1000;
+    }
+
+    .container { max-width: 440px; margin: 0 auto; padding: 10px; }
+    
+    .header {
+      text-align: center;
+      padding: 12px 0;
+      border-bottom: 2px solid #00ff41;
+      margin-bottom: 15px;
+    }
+
+    .header h1 {
+      font-size: 1.5em;
+      text-shadow: 0 0 10px #00ff41;
+      letter-spacing: 2px;
+    }
+
+    .info-panel {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .info-box {
+      background: rgba(0, 255, 65, 0.05);
+      border: 1px solid #00ff41;
+      padding: 6px;
+      text-align: center;
+      border-radius: 3px;
+    }
+
+    .info-box .label { font-size: 0.6em; color: #00aa2a; }
+    .info-box .value { font-size: 1.3em; text-shadow: 0 0 8px #00ff41; }
+
+    /* ─── ПЕРИСКОП ─── */
+    .periscope {
+      position: relative;
+      margin: 0 auto 10px auto;
+      border: 3px solid #00ff41;
+      border-radius: 50%;
+      width: 360px;
+      height: 360px;
+      overflow: hidden;
+      background: radial-gradient(circle, #0a1628 65%, #051018 100%);
+      box-shadow: 0 0 15px rgba(0, 255, 65, 0.3), inset 0 0 20px rgba(0, 0, 0, 0.8);
+    }
+
+    .periscope-crosshair {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%; height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .periscope-crosshair::before, .periscope-crosshair::after {
+      content: '';
+      position: absolute;
+      background: rgba(0, 255, 65, 0.12);
+    }
+    .periscope-crosshair::before { top: 50%; left: 0; width: 100%; height: 1px; }
+    .periscope-crosshair::after { left: 50%; top: 0; width: 1px; height: 100%; }
+
+    .board-container { position: relative; width: 100%; height: 100%; }
+
+    /* Игровое поле точно по центру круга */
+    .board {
+      position: absolute;
+      top: 13%; left: 13%;
+      width: 74%; height: 74%;
+      display: grid;
+      grid-template-columns: auto repeat(10, 1fr);
+      grid-template-rows: auto repeat(10, 1fr);
+      gap: 1px;
+    }
+
+    .board-label {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.55em;
+      color: #00ff41;
+      font-weight: bold;
+    }
+
+    .cell {
+      background: rgba(0, 60, 120, 0.35);
+      border: 1px solid rgba(0, 255, 65, 0.2);
+      cursor: pointer;
+      position: relative;
+      border-radius: 1px;
+    }
+
+    .cell.unknown:hover { background: rgba(0, 255, 65, 0.25); }
+
+    .cell.miss {
+      background: rgba(0, 40, 80, 0.2);
+      cursor: default;
+    }
+    .cell.miss::after {
+      content: '•';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: #00aa2a;
+      font-size: 0.9em;
+    }
+
+    .cell.hit {
+      background: rgba(255, 60, 0, 0.5);
+      border-color: #ff3c00;
+    }
+    .cell.hit::after {
+      content: '🔥';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 0.65em;
+    }
+
+    .cell.sunk {
+      background: rgba(255, 0, 0, 0.6);
+      border-color: #ff0000;
+    }
+    .cell.sunk::after {
+      content: '💀';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 0.65em;
+    }
+
+    .cell.revealed { background: rgba(100, 100, 100, 0.3); }
+    .cell.revealed::after {
+      content: '▪';
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      color: #aaa;
+    }
+
+    .message-bar {
+      background: rgba(0, 255, 65, 0.05);
+      border: 1px solid #00ff41;
+      padding: 8px;
+      text-align: center;
+      margin-bottom: 10px;
+      font-size: 0.8em;
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 3px;
+    }
+
+    .controls { display: flex; gap: 10px; margin-bottom: 10px; }
+
+    .btn {
+      flex: 1;
+      padding: 10px;
+      background: transparent;
+      border: 2px solid #00ff41;
+      color: #00ff41;
+      font-family: 'Courier New', monospace;
+      font-size: 0.8em;
+      cursor: pointer;
+      text-transform: uppercase;
+      border-radius: 3px;
+    }
+    .btn:active { background: #00ff41; color: #0a1628; }
+    .btn.accent { border-color: #ffaa00; color: #ffaa00; }
+    .btn.accent:active { background: #ffaa00; color: #0a1628; }
+
+    .fleet-status { display: flex; justify-content: center; gap: 5px; margin-bottom: 10px; flex-wrap: wrap; }
+    .ship-indicator { display: flex; gap: 1px; }
+    .ship-indicator.destroyed { opacity: 0.2; }
+    .ship-segment { width: 8px; height: 8px; background: #00ff41; }
+    .ship-indicator.destroyed .ship-segment { background: #ff3c00; }
+
+    .start-screen { text-align: center; padding: 20px 10px; }
+    
+    /* Форма ввода имени */
+    .input-group {
+      margin: 20px 0;
+      position: relative;
+    }
+    
+    .start-screen input {
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid #00ff41;
+      color: #00ff41;
+      font-family: 'Courier New', monospace;
+      font-size: 1.1em;
+      padding: 8px;
+      text-align: center;
+      width: 80%;
+      outline: none;
+      transition: border-color 0.3s;
+    }
+
+    .start-screen input.error {
+      border-color: #ff3c00;
+      animation: shake 0.3s;
+    }
+
+    .error-hint {
+      color: #ff3c00;
+      font-size: 0.7em;
+      margin-top: 5px;
+      min-height: 15px;
+    }
+
+    @keyframes shake {
+      0%, 100% { transform: translateX(0); }
+      20%, 60% { transform: translateX(-5px); }
+      40%, 80% { transform: translateX(5px); }
+    }
+
+    /* Таблица рекордов */
+    .scores-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.75em;
+      margin-top: 10px;
+      background: rgba(0,255,65,0.05);
+      border: 1px solid #00ff41;
+    }
+    .scores-table th { border-bottom: 1px solid #00ff41; padding: 6px; color: #00aa2a; text-align: left; }
+    .scores-table td { padding: 6px; border-bottom: 1px solid rgba(0, 255, 65, 0.1); }
+    .scores-table tr:first-child td { color: #ffaa00; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Стартовый экран -->
+    <div id="startScreen" class="start-screen">
+      <div class="header">
+        <h1>⚓ МОРСКОЙ БОЙ</h1>
+      </div>
+
+      <div class="input-group">
+        <input type="text" id="playerNameInput" placeholder="ВВЕДИТЕ ВАШЕ ИМЯ" maxlength="20" onkeydown="if(event.key==='Enter') startNewGame()">
+        <div id="nameErrorHint" class="error-hint"></div>
+      </div>
+
+      <div class="controls">
+        <button class="btn accent" onclick="startNewGame()">🚀 НАЧАТЬ ИГРУ</button>
+      </div>
+      <div class="controls">
+        <button class="btn" onclick="showScores()">🏆 РЕКОРДЫ</button>
+      </div>
+      <div id="scoresContainer"></div>
+    </div>
+
+    <!-- Игровой экран -->
+    <div id="gameScreen" style="display: none;">
+      <div class="header"><h1>⚓ МОРСКОЙ БОЙ</h1></div>
+
+      <div class="info-panel">
+        <div class="info-box"><div class="label">ОЧКИ</div><div class="value" id="scoreDisplay">0</div></div>
+        <div class="info-box"><div class="label">ВЫСТРЕЛЫ</div><div class="value" id="shotsDisplay">40</div></div>
+        <div class="info-box"><div class="label">КОРАБЛИ</div><div class="value" id="shipsDisplay">10</div></div>
+      </div>
+
+      <div class="fleet-status" id="fleetStatus"></div>
+      <div class="message-bar" id="messageBar">Наведите перископ и стреляйте! 🎯</div>
+
+      <div class="periscope">
+        <div class="periscope-crosshair"></div>
+        <div class="board-container"><div class="board" id="gameBoard"></div></div>
+      </div>
+
+      <div class="controls">
+        <button class="btn" onclick="returnToMenu()">◀ МЕНЮ</button>
+        <button class="btn accent" onclick="startNewGame()">🔄 ЗАНОВО</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ─── ЗВУКОВОЙ ДВИЖОК ───
+    class SoundEngine {
+      constructor() { this.ctx = null; }
+      init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
+      play(type) {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+        osc.connect(gain); gain.connect(this.ctx.destination);
+        if (type === 'miss') {
+          osc.frequency.setValueAtTime(150, this.ctx.currentTime); gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+          osc.start(); osc.stop(this.ctx.currentTime + 0.15);
+        } else if (type === 'hit') {
+          osc.frequency.setValueAtTime(600, this.ctx.currentTime); gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+          osc.start(); osc.stop(this.ctx.currentTime + 0.2);
+        } else if (type === 'sunk') {
+          osc.frequency.setValueAtTime(300, this.ctx.currentTime); gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+          osc.start(); osc.stop(this.ctx.currentTime + 0.4);
+        }
+      }
+    }
+    const sound = new SoundEngine();
+
+    // ─── СОСТОЯНИЕ ИГРЫ ───
+    let localGame = null;
+    let destroyedShips = new Set();
+    let selectedRow = 0, selectedCol = 0;
+    const ROW_LABELS = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К'];
+
+    function initBoard() {
+      const board = document.getElementById('gameBoard');
+      board.innerHTML = '<div class="board-label"></div>';
+      for (let c = 0; c < 10; c++) board.innerHTML += `<div class="board-label">${c + 1}</div>`;
+
+      for (let r = 0; r < 10; r++) {
+        board.innerHTML += `<div class="board-label">${ROW_LABELS[r]}</div>`;
+        for (let c = 0; c < 10; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell unknown';
+          cell.id = `cell-${r}-${c}`;
+          cell.onclick = () => handleCellClick(r, c);
+          board.appendChild(cell);
+        }
+      }
+    }
+
+    function initFleetStatus() {
+      const fleet = document.getElementById('fleetStatus');
+      const ships = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1];
+      fleet.innerHTML = ships.map((size, idx) => {
+        const segs = Array(size).fill('<div class="ship-segment"></div>').join('');
+        return `<div class="ship-indicator" id="ship-ind-${idx + 1}">${segs}</div>`;
+      }).join('');
+    }
+
+    // ─── СТАРТ ИГРЫ С ПРОВЕРКОЙ ИМЕНИ ───
+    function startNewGame() {
+      const nameInput = document.getElementById('playerNameInput');
+      const errorHint = document.getElementById('nameErrorHint');
+      const playerName = nameInput.value.trim();
+
+      // ПРОВЕРКА: Не начинать игру без имени
+      if (!playerName) {
+        nameInput.classList.add('error');
+        errorHint.textContent = 'ОШИБКА: Введите имя перед началом боя!';
+        nameInput.focus();
+        return;
+      }
+
+      // Если имя введено - сбрасываем подсветку ошибки
+      nameInput.classList.remove('error');
+      errorHint.textContent = '';
+
+      sound.init();
+      
+      localGame = {
+        playerName, 
+        grid: generateLocalShips(),
+        score: 0, 
+        shots: 0, 
+        maxShots: 40,
+        hitCells: new Set(), 
+        status: 'active'
+      };
+
+      document.getElementById('startScreen').style.display = 'none';
+      document.getElementById('gameScreen').style.display = 'block';
+
+      initBoard(); 
+      initFleetStatus();
+      destroyedShips.clear();
+      updateDisplay(0, 40, 10);
+      setMessage(`Капитан ${playerName}, перископ готов! 🎯`);
+      highlightCell(selectedRow, selectedCol);
+    }
+
+    function generateLocalShips() {
+      const shipSizes = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1];
+      const grid = Array.from({ length: 10 }, () => Array(10).fill(0));
+      let shipId = 1;
+
+      for (const size of shipSizes) {
+        let placed = false, attempts = 0;
+        while (!placed && attempts < 1000) {
+          attempts++;
+          const horiz = Math.random() > 0.5;
+          const r = Math.floor(Math.random() * 10);
+          const c = Math.floor(Math.random() * 10);
+
+          if (canPlaceLocal(grid, r, c, size, horiz)) {
+            for (let i = 0; i < size; i++) grid[horiz ? r : r + i][horiz ? c + i : c] = shipId;
+            placed = true; shipId++;
+          }
+        }
+        if (!placed) return generateLocalShips();
+      }
+      return grid;
+    }
+
+    function canPlaceLocal(grid, row, col, size, horiz) {
+      for (let i = 0; i < size; i++) {
+        const r = horiz ? row : row + i, c = horiz ? col + i : col;
+        if (r >= 10 || c >= 10) return false;
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const nr = r + dr, nc = c + dc;
+            if (nr >= 0 && nr < 10 && nc >= 0 && nc < 10 && grid[nr][nc] !== 0) return false;
+          }
+        }
+      }
+      return true;
+    }
+
+    // ─── ВЫСТРЕЛ И ОБРАБОТКА ───
+    function handleCellClick(row, col) {
+      if (!localGame || localGame.status !== 'active') return;
+      const key = `${row}-${col}`;
+      if (localGame.hitCells.has(key)) return;
+
+      localGame.hitCells.add(key);
+      const cell = document.getElementById(`cell-${row}-${col}`);
+      const shipId = localGame.grid[row][col];
+
+      if (shipId > 0) {
+        let shipCells = [], allHit = true;
+
+        for (let r = 0; r < 10; r++) {
+          for (let c = 0; c < 10; c++) {
+            if (localGame.grid[r][c] === shipId) {
+              shipCells.push({ r, c });
+              if (!localGame.hitCells.has(`${r}-${c}`)) allHit = false;
+            }
+          }
+        }
+
+        if (allHit) {
+          // ПОТОПЛЕН!
+          shipCells.forEach(sc => {
+            document.getElementById(`cell-${sc.r}-${sc.c}`).className = 'cell sunk';
+          });
+          localGame.score += shipCells.length * 20;
+          destroyedShips.add(shipId);
+          markShipDestroyed(shipId);
+          sound.play('sunk');
+          setMessage(`Потоплен! (${shipCells.length}-палубный) 💀`);
+
+          // АВТО-ОБВОДКА (БЕЗ ТРАТЫ ВЫСТРЕЛОВ)
+          shipCells.forEach(sc => {
+            for (let dr = -1; dr <= 1; dr++) {
+              for (let dc = -1; dc <= 1; dc++) {
+                const nr = sc.r + dr, nc = sc.c + dc;
+                if (nr >= 0 && nr < 10 && nc >= 0 && nc < 10) {
+                  const nKey = `${nr}-${nc}`;
+                  if (!localGame.hitCells.has(nKey) && localGame.grid[nr][nc] === 0) {
+                    localGame.hitCells.add(nKey);
+                    const nCell = document.getElementById(`cell-${nr}-${nc}`);
+                    if (nCell) nCell.className = 'cell miss';
+                  }
+                }
+              }
+            }
+          });
+
+        } else {
+          cell.className = 'cell hit';
+          localGame.score += 10;
+          sound.play('hit');
+          setMessage('Попадание! 🔥');
+        }
+
+        // Проверка победы
+        let remainingSegments = 0;
+        for (let r = 0; r < 10; r++)
+          for (let c = 0; c < 10; c++)
+            if (localGame.grid[r][c] > 0 && !localGame.hitCells.has(`${r}-${c}`)) remainingSegments++;
+
+        if (remainingSegments === 0) {
+          localGame.status = 'won';
+          setMessage('🎉 ПОБЕДА! Все корабли потоплены!');
+          saveRecordToServer(localGame.playerName, localGame.score, localGame.shots);
+        }
+
+      } else {
+        // Промах (Тратится выстрел)
+        cell.className = 'cell miss';
+        localGame.shots++;
+        sound.play('miss');
+        setMessage('Мимо! 💨');
+
+        if (localGame.shots >= localGame.maxShots) {
+          localGame.status = 'lost';
+          setMessage('💥 Выстрелы закончились!');
+          revealAllShips();
+          saveRecordToServer(localGame.playerName, localGame.score, localGame.shots);
+        }
+      }
+
+      updateDisplay(localGame.score, localGame.maxShots - localGame.shots, 10 - destroyedShips.size);
+    }
+
+    // ─── СОХРАНЕНИЕ РЕКОРДА ───
+    async function saveRecordToServer(name, score, shots) {
+      try {
+        const id = typeof crypto !== 'undefined' && crypto.randomUUID 
+          ? crypto.randomUUID() 
+          : 'id-' + Math.random().toString(36).substr(2, 9) + '-' + Date.now();
+
+        await fetch('/api/HighScores', {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify({ 
+            ID: id,
+            playerName: name, 
+            score: score, 
+            shots: shots, 
+            playedAt: new Date().toISOString() 
+          })
+        });
+        console.log('Рекорд сохранён в базу!');
+      } catch (err) { 
+        console.error('Ошибка сохранения рекорда:', err); 
+      }
+    }
+
+    // ─── ТАБЛИЦА РЕКОРДОВ ───
+    async function showScores() {
+      const container = document.getElementById('scoresContainer');
+      container.innerHTML = '<p style="text-align:center; padding:10px;">Загрузка...</p>';
+      
+      try {
+        const res = await fetch('/api/HighScores?$orderby=score desc&$top=10');
+        if (!res.ok) throw new Error('Ошибка ' + res.status);
+        
+        const data = await res.json();
+        const scores = data.value;
+
+        if (scores && scores.length > 0) {
+          container.innerHTML = `
+            <table class="scores-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>ИМЯ</th>
+                  <th>ОЧКИ</th>
+                  <th>ВЫСТР.</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${scores.map((s, i) => `
+                  <tr>
+                    <td>${i + 1}</td>
+                    <td>${s.playerName}</td>
+                    <td>${s.score}</td>
+                    <td>${s.shots}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>`;
+        } else {
+          container.innerHTML = '<p style="text-align:center; padding:10px; color:#00aa2a;">Пока нет рекордов. Будь первым!</p>';
+        }
+      } catch (err) {
+        console.error('Ошибка загрузки:', err);
+        container.innerHTML = '<p style="text-align:center; color:#ff3c00; padding:10px;">Не удалось загрузить рекорды</p>';
+      }
+    }
+
+    function revealAllShips() {
+      for (let r = 0; r < 10; r++) {
+        for (let c = 0; c < 10; c++) {
+          if (localGame.grid[r][c] > 0 && !localGame.hitCells.has(`${r}-${c}`)) {
+            document.getElementById(`cell-${r}-${c}`).className = 'cell revealed';
+          }
+        }
+      }
+    }
+
+    function updateDisplay(score, shotsLeft, shipsLeft) {
+      document.getElementById('scoreDisplay').textContent = score;
+      document.getElementById('shotsDisplay').textContent = shotsLeft;
+      document.getElementById('shipsDisplay').textContent = shipsLeft;
+    }
+
+    function setMessage(msg) { document.getElementById('messageBar').textContent = msg; }
+    
+    function markShipDestroyed(shipId) {
+      const el = document.getElementById(`ship-ind-${shipId}`);
+      if (el) el.classList.add('destroyed');
+    }
+
+    function returnToMenu() {
+      document.getElementById('startScreen').style.display = 'block';
+      document.getElementById('gameScreen').style.display = 'none';
+      localGame = null;
+    }
+
+    // ─── УПРАВЛЕНИЕ КЛАВИАТУРОЙ (ПК) ───
+    function highlightCell(r, c) {
+      document.querySelectorAll('.cell').forEach(el => el.style.outline = '');
+      const target = document.getElementById(`cell-${r}-${c}`);
+      if (target) {
+        target.style.outline = '2px solid #ffaa00';
+        target.style.outlineOffset = '-1px';
+      }
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (document.getElementById('gameScreen').style.display !== 'block') return;
+      switch (e.key) {
+        case 'ArrowUp': case 'w': case 'W':
+          if (selectedRow > 0) selectedRow--; highlightCell(selectedRow, selectedCol); e.preventDefault(); break;
+        case 'ArrowDown': case 's': case 'S':
+          if (selectedRow < 9) selectedRow++; highlightCell(selectedRow, selectedCol); e.preventDefault(); break;
+        case 'ArrowLeft': case 'a': case 'A':
+          if (selectedCol > 0) selectedCol--; highlightCell(selectedRow, selectedCol); e.preventDefault(); break;
+        case 'ArrowRight': case 'd': case 'D':
+          if (selectedCol < 9) selectedCol++; highlightCell(selectedRow, selectedCol); e.preventDefault(); break;
+        case ' ': case 'Enter':
+          handleCellClick(selectedRow, selectedCol); e.preventDefault(); break;
+      }
+    });
+  </script>
+</body>
+</html>
