@@ -2,10 +2,20 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0a1628">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>⚓ Морской Бой</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    * { 
+      margin: 0; 
+      padding: 0; 
+      box-sizing: border-box; 
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation; /* Убирает задержку тапа на Android */
+      -webkit-user-select: none;
+      user-select: none; /* Запрещает случайное выделение текста пальцем */
+    }
     
     body {
       background: #0a1628;
@@ -36,13 +46,13 @@
     
     .header {
       text-align: center;
-      padding: 12px 0;
+      padding: 8px 0;
       border-bottom: 2px solid #00ff41;
-      margin-bottom: 15px;
+      margin-bottom: 10px;
     }
 
     .header h1 {
-      font-size: 1.5em;
+      font-size: 1.4em;
       text-shadow: 0 0 10px #00ff41;
       letter-spacing: 2px;
     }
@@ -71,8 +81,8 @@
       margin: 0 auto 10px auto;
       border: 3px solid #00ff41;
       border-radius: 50%;
-      width: 360px;
-      height: 360px;
+      width: 350px;
+      height: 350px;
       overflow: hidden;
       background: radial-gradient(circle, #0a1628 65%, #051018 100%);
       box-shadow: 0 0 15px rgba(0, 255, 65, 0.3), inset 0 0 20px rgba(0, 0, 0, 0.8);
@@ -83,7 +93,7 @@
       top: 50%; left: 50%;
       transform: translate(-50%, -50%);
       width: 100%; height: 100%;
-      pointer-events: none;
+      pointer-events: none; /* Пропускает касание пальцем к клеткам */
       z-index: 10;
     }
 
@@ -100,8 +110,8 @@
     /* Игровое поле точно по центру круга */
     .board {
       position: absolute;
-      top: 13%; left: 13%;
-      width: 74%; height: 74%;
+      top: 12%; left: 12%;
+      width: 76%; height: 76%;
       display: grid;
       grid-template-columns: auto repeat(10, 1fr);
       grid-template-rows: auto repeat(10, 1fr);
@@ -117,15 +127,18 @@
       font-weight: bold;
     }
 
+    /* Клетки с мгновенной реакцией на палец */
     .cell {
-      background: rgba(0, 60, 120, 0.35);
+      background: rgba(0, 60, 120, 0.4);
       border: 1px solid rgba(0, 255, 65, 0.2);
       cursor: pointer;
       position: relative;
       border-radius: 1px;
     }
 
-    .cell.unknown:hover { background: rgba(0, 255, 65, 0.25); }
+    .cell:active {
+      background: rgba(0, 255, 65, 0.5); /* Визуальный отклик при нажатии пальцем */
+    }
 
     .cell.miss {
       background: rgba(0, 40, 80, 0.2);
@@ -191,12 +204,12 @@
 
     .btn {
       flex: 1;
-      padding: 10px;
+      padding: 12px;
       background: transparent;
       border: 2px solid #00ff41;
       color: #00ff41;
       font-family: 'Courier New', monospace;
-      font-size: 0.8em;
+      font-size: 0.85em;
       cursor: pointer;
       text-transform: uppercase;
       border-radius: 3px;
@@ -213,11 +226,7 @@
 
     .start-screen { text-align: center; padding: 20px 10px; }
     
-    /* Форма ввода имени */
-    .input-group {
-      margin: 20px 0;
-      position: relative;
-    }
+    .input-group { margin: 20px 0; }
     
     .start-screen input {
       background: transparent;
@@ -230,26 +239,12 @@
       text-align: center;
       width: 80%;
       outline: none;
-      transition: border-color 0.3s;
+      -webkit-user-select: auto;
+      user-select: auto; /* Позволяет вводить имя */
     }
 
-    .start-screen input.error {
-      border-color: #ff3c00;
-      animation: shake 0.3s;
-    }
-
-    .error-hint {
-      color: #ff3c00;
-      font-size: 0.7em;
-      margin-top: 5px;
-      min-height: 15px;
-    }
-
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      20%, 60% { transform: translateX(-5px); }
-      40%, 80% { transform: translateX(5px); }
-    }
+    .start-screen input.error { border-color: #ff3c00; }
+    .error-hint { color: #ff3c00; font-size: 0.7em; margin-top: 5px; min-height: 15px; }
 
     /* Таблица рекордов */
     .scores-table {
@@ -274,7 +269,7 @@
       </div>
 
       <div class="input-group">
-        <input type="text" id="playerNameInput" placeholder="ВВЕДИТЕ ВАШЕ ИМЯ" maxlength="20" onkeydown="if(event.key==='Enter') startNewGame()">
+        <input type="text" id="playerNameInput" placeholder="ВВЕДИТЕ ВАШЕ ИМЯ" maxlength="20">
         <div id="nameErrorHint" class="error-hint"></div>
       </div>
 
@@ -298,7 +293,7 @@
       </div>
 
       <div class="fleet-status" id="fleetStatus"></div>
-      <div class="message-bar" id="messageBar">Наведите перископ и стреляйте! 🎯</div>
+      <div class="message-bar" id="messageBar">Касайтесь клеток для выстрела! 🎯</div>
 
       <div class="periscope">
         <div class="periscope-crosshair"></div>
@@ -313,23 +308,31 @@
   </div>
 
   <script>
-    // ─── ЗВУКОВОЙ ДВИЖОК ───
+    // ─── ЗВУК И ВИБРАЦИЯ ───
     class SoundEngine {
       constructor() { this.ctx = null; }
       init() { if (!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); }
       play(type) {
-        if (!this.ctx) return;
-        const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
-        osc.connect(gain); gain.connect(this.ctx.destination);
-        if (type === 'miss') {
-          osc.frequency.setValueAtTime(150, this.ctx.currentTime); gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
-          osc.start(); osc.stop(this.ctx.currentTime + 0.15);
-        } else if (type === 'hit') {
-          osc.frequency.setValueAtTime(600, this.ctx.currentTime); gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
-          osc.start(); osc.stop(this.ctx.currentTime + 0.2);
-        } else if (type === 'sunk') {
-          osc.frequency.setValueAtTime(300, this.ctx.currentTime); gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
-          osc.start(); osc.stop(this.ctx.currentTime + 0.4);
+        if (this.ctx) {
+          const osc = this.ctx.createOscillator(); const gain = this.ctx.createGain();
+          osc.connect(gain); gain.connect(this.ctx.destination);
+          if (type === 'miss') {
+            osc.frequency.setValueAtTime(150, this.ctx.currentTime); gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+            osc.start(); osc.stop(this.ctx.currentTime + 0.15);
+          } else if (type === 'hit') {
+            osc.frequency.setValueAtTime(600, this.ctx.currentTime); gain.gain.setValueAtTime(0.4, this.ctx.currentTime);
+            osc.start(); osc.stop(this.ctx.currentTime + 0.2);
+          } else if (type === 'sunk') {
+            osc.frequency.setValueAtTime(300, this.ctx.currentTime); gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+            osc.start(); osc.stop(this.ctx.currentTime + 0.4);
+          }
+        }
+
+        // 📳 Виброотклик для Android-смартфонов
+        if (navigator.vibrate) {
+          if (type === 'miss') navigator.vibrate(25); // Короткий импульс
+          else if (type === 'hit') navigator.vibrate([40, 30, 40]); // Двойной импульс
+          else if (type === 'sunk') navigator.vibrate([80, 50, 80, 50, 150]); // Мощная вибрация
         }
       }
     }
@@ -338,7 +341,6 @@
     // ─── СОСТОЯНИЕ ИГРЫ ───
     let localGame = null;
     let destroyedShips = new Set();
-    let selectedRow = 0, selectedCol = 0;
     const ROW_LABELS = ['А', 'Б', 'В', 'Г', 'Д', 'Е', 'Ж', 'З', 'И', 'К'];
 
     function initBoard() {
@@ -352,7 +354,13 @@
           const cell = document.createElement('div');
           cell.className = 'cell unknown';
           cell.id = `cell-${r}-${c}`;
-          cell.onclick = () => handleCellClick(r, c);
+          
+          // Мгновенный выстрел по касанию пальца
+          cell.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            handleCellClick(r, c);
+          });
+
           board.appendChild(cell);
         }
       }
@@ -367,13 +375,11 @@
       }).join('');
     }
 
-    // ─── СТАРТ ИГРЫ С ПРОВЕРКОЙ ИМЕНИ ───
     function startNewGame() {
       const nameInput = document.getElementById('playerNameInput');
       const errorHint = document.getElementById('nameErrorHint');
       const playerName = nameInput.value.trim();
 
-      // ПРОВЕРКА: Не начинать игру без имени
       if (!playerName) {
         nameInput.classList.add('error');
         errorHint.textContent = 'ОШИБКА: Введите имя перед началом боя!';
@@ -381,10 +387,8 @@
         return;
       }
 
-      // Если имя введено - сбрасываем подсветку ошибки
       nameInput.classList.remove('error');
       errorHint.textContent = '';
-
       sound.init();
       
       localGame = {
@@ -404,8 +408,7 @@
       initFleetStatus();
       destroyedShips.clear();
       updateDisplay(0, 40, 10);
-      setMessage(`Капитан ${playerName}, перископ готов! 🎯`);
-      highlightCell(selectedRow, selectedCol);
+      setMessage(`Капитан ${playerName}, огонь по цели! 🎯`);
     }
 
     function generateLocalShips() {
@@ -445,7 +448,6 @@
       return true;
     }
 
-    // ─── ВЫСТРЕЛ И ОБРАБОТКА ───
     function handleCellClick(row, col) {
       if (!localGame || localGame.status !== 'active') return;
       const key = `${row}-${col}`;
@@ -468,7 +470,6 @@
         }
 
         if (allHit) {
-          // ПОТОПЛЕН!
           shipCells.forEach(sc => {
             document.getElementById(`cell-${sc.r}-${sc.c}`).className = 'cell sunk';
           });
@@ -478,7 +479,7 @@
           sound.play('sunk');
           setMessage(`Потоплен! (${shipCells.length}-палубный) 💀`);
 
-          // АВТО-ОБВОДКА (БЕЗ ТРАТЫ ВЫСТРЕЛОВ)
+          // Авто-обводка
           shipCells.forEach(sc => {
             for (let dr = -1; dr <= 1; dr++) {
               for (let dc = -1; dc <= 1; dc++) {
@@ -502,7 +503,6 @@
           setMessage('Попадание! 🔥');
         }
 
-        // Проверка победы
         let remainingSegments = 0;
         for (let r = 0; r < 10; r++)
           for (let c = 0; c < 10; c++)
@@ -515,7 +515,6 @@
         }
 
       } else {
-        // Промах (Тратится выстрел)
         cell.className = 'cell miss';
         localGame.shots++;
         sound.play('miss');
@@ -532,7 +531,6 @@
       updateDisplay(localGame.score, localGame.maxShots - localGame.shots, 10 - destroyedShips.size);
     }
 
-    // ─── СОХРАНЕНИЕ РЕКОРДА ───
     async function saveRecordToServer(name, score, shots) {
       try {
         const id = typeof crypto !== 'undefined' && crypto.randomUUID 
@@ -541,63 +539,32 @@
 
         await fetch('/api/HighScores', {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body: JSON.stringify({ 
-            ID: id,
-            playerName: name, 
-            score: score, 
-            shots: shots, 
-            playedAt: new Date().toISOString() 
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ID: id, playerName: name, score: score, shots: shots, playedAt: new Date().toISOString() })
         });
-        console.log('Рекорд сохранён в базу!');
-      } catch (err) { 
-        console.error('Ошибка сохранения рекорда:', err); 
-      }
+      } catch (err) {}
     }
 
-    // ─── ТАБЛИЦА РЕКОРДОВ ───
     async function showScores() {
       const container = document.getElementById('scoresContainer');
       container.innerHTML = '<p style="text-align:center; padding:10px;">Загрузка...</p>';
-      
       try {
         const res = await fetch('/api/HighScores?$orderby=score desc&$top=10');
-        if (!res.ok) throw new Error('Ошибка ' + res.status);
-        
         const data = await res.json();
         const scores = data.value;
 
         if (scores && scores.length > 0) {
           container.innerHTML = `
             <table class="scores-table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>ИМЯ</th>
-                  <th>ОЧКИ</th>
-                  <th>ВЫСТР.</th>
-                </tr>
-              </thead>
+              <thead><tr><th>#</th><th>ИМЯ</th><th>ОЧКИ</th><th>ВЫСТР.</th></tr></thead>
               <tbody>
-                ${scores.map((s, i) => `
-                  <tr>
-                    <td>${i + 1}</td>
-                    <td>${s.playerName}</td>
-                    <td>${s.score}</td>
-                    <td>${s.shots}</td>
-                  </tr>
-                `).join('')}
+                ${scores.map((s, i) => `<tr><td>${i + 1}</td><td>${s.playerName}</td><td>${s.score}</td><td>${s.shots}</td></tr>`).join('')}
               </tbody>
             </table>`;
         } else {
-          container.innerHTML = '<p style="text-align:center; padding:10px; color:#00aa2a;">Пока нет рекордов. Будь первым!</p>';
+          container.innerHTML = '<p style="text-align:center; padding:10px; color:#00aa2a;">Пока нет рекордов</p>';
         }
       } catch (err) {
-        console.error('Ошибка загрузки:', err);
         container.innerHTML = '<p style="text-align:center; color:#ff3c00; padding:10px;">Не удалось загрузить рекорды</p>';
       }
     }
@@ -619,7 +586,6 @@
     }
 
     function setMessage(msg) { document.getElementById('messageBar').textContent = msg; }
-    
     function markShipDestroyed(shipId) {
       const el = document.getElementById(`ship-ind-${shipId}`);
       if (el) el.classList.add('destroyed');
@@ -630,32 +596,6 @@
       document.getElementById('gameScreen').style.display = 'none';
       localGame = null;
     }
-
-    // ─── УПРАВЛЕНИЕ КЛАВИАТУРОЙ (ПК) ───
-    function highlightCell(r, c) {
-      document.querySelectorAll('.cell').forEach(el => el.style.outline = '');
-      const target = document.getElementById(`cell-${r}-${c}`);
-      if (target) {
-        target.style.outline = '2px solid #ffaa00';
-        target.style.outlineOffset = '-1px';
-      }
-    }
-
-    document.addEventListener('keydown', (e) => {
-      if (document.getElementById('gameScreen').style.display !== 'block') return;
-      switch (e.key) {
-        case 'ArrowUp': case 'w': case 'W':
-          if (selectedRow > 0) selectedRow--; highlightCell(selectedRow, selectedCol); e.preventDefault(); break;
-        case 'ArrowDown': case 's': case 'S':
-          if (selectedRow < 9) selectedRow++; highlightCell(selectedRow, selectedCol); e.preventDefault(); break;
-        case 'ArrowLeft': case 'a': case 'A':
-          if (selectedCol > 0) selectedCol--; highlightCell(selectedRow, selectedCol); e.preventDefault(); break;
-        case 'ArrowRight': case 'd': case 'D':
-          if (selectedCol < 9) selectedCol++; highlightCell(selectedRow, selectedCol); e.preventDefault(); break;
-        case ' ': case 'Enter':
-          handleCellClick(selectedRow, selectedCol); e.preventDefault(); break;
-      }
-    });
   </script>
 </body>
 </html>
