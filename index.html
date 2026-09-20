@@ -170,7 +170,23 @@
       play(type) {
         if (!this.ctx) return;
 
-        if (type === 'miss') {
+        // 🚀 СТАРТ ИГРЫ (Сигнал боевой тревоги / сонар)
+        if (type === 'start') {
+          const notes = [261.63, 329.63, 392.00, 523.25]; // C4, E4, G4, C5
+          notes.forEach((freq, idx) => {
+            setTimeout(() => {
+              try {
+                const o = this.ctx.createOscillator(), g = this.ctx.createGain();
+                o.connect(g); g.connect(this.ctx.destination);
+                o.type = 'triangle'; o.frequency.value = freq;
+                g.gain.setValueAtTime(0.18, this.ctx.currentTime);
+                g.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.15);
+                o.start(); o.stop(this.ctx.currentTime + 0.15);
+              } catch(e){}
+            }, idx * 80);
+          });
+        }
+        else if (type === 'miss') {
           const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
           osc.connect(gain); gain.connect(this.ctx.destination);
           osc.frequency.value = 150; gain.gain.value = 0.1; 
@@ -188,7 +204,7 @@
         } 
         // 🎺 ПОБЕДНАЯ МЕЛОДИЯ (8-bit Fanfare)
         else if (type === 'win') {
-          const notes = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50]; // C5, E5, G5, C6, G5, C6
+          const notes = [523.25, 659.25, 783.99, 1046.50, 783.99, 1046.50];
           notes.forEach((freq, idx) => {
             setTimeout(() => {
               try {
@@ -204,7 +220,7 @@
         } 
         // 💥 МЕЛОДИЯ ПРОИГРЫША (Game Over)
         else if (type === 'lose') {
-          const notes = [400, 350, 300, 220]; // Нисходящий гул
+          const notes = [400, 350, 300, 220];
           notes.forEach((freq, idx) => {
             setTimeout(() => {
               try {
@@ -222,7 +238,8 @@
         // Вибрация
         if (navigator.vibrate) {
           try {
-            if (type === 'miss') navigator.vibrate(25);
+            if (type === 'start') navigator.vibrate([30, 30, 30, 30, 60]);
+            else if (type === 'miss') navigator.vibrate(25);
             else if (type === 'hit') navigator.vibrate([40, 30, 40]);
             else if (type === 'sunk') navigator.vibrate([100, 50, 100]);
             else if (type === 'win') navigator.vibrate([100, 50, 100, 50, 200]);
@@ -282,6 +299,8 @@
       }
       
       sound.init();
+      sound.play('start'); // 🚀 Звук старта боя
+      
       const grid = generateShips();
       
       localGame = { name, grid, score: 0, shots: 0, maxShots: 40, hitCells: new Set(), status: 'active' };
@@ -405,7 +424,6 @@
         setMessage("МИМО... 💨");
       }
 
-      // ПРОВЕРКА ПОБЕДЫ ИЛИ ПРОИГРЫША
       if (destroyedShips.size === 10) { 
         localGame.status = 'won'; 
         setMessage("🎉 ПОБЕДА! Все корабли уничтожены!"); 
@@ -423,105 +441,5 @@
       updateFleetStatus();
     }
 
-    // ─── СОХРАНЕНИЕ РЕКОРДОВ (В ПАМЯТЬ ТЕЛЕФОНА + BTP) ───
     function finishGame() {
-      // 1. Сохранение локально на смартфоне
-      let scores = JSON.parse(localStorage.getItem('seabattle_scores') || '[]');
-      scores.push({
-        name: localGame.name,
-        score: localGame.score,
-        shots: localGame.shots
-      });
-      // Сортировка по очкам (по убыванию)
-      scores.sort((a, b) => b.score - a.score);
-      scores = scores.slice(0, 10); // Хранить только ТОП-10
-      localStorage.setItem('seabattle_scores', JSON.stringify(scores));
-
-      // 2. Попытка отправить на BTP Сервер (если подключен)
-      const id = 'id' + Date.now();
-      fetch('/api/HighScores', {
-        method: 'POST', 
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ ID: id, playerName: localGame.name, score: localGame.score, shots: localGame.shots, playedAt: new Date().toISOString() })
-      }).catch(()=>{});
-    }
-
-    function reveal() {
-      for (let i = 0; i < 10; i++) {
-        for (let j = 0; j < 10; j++) {
-          if (localGame.grid[i][j] > 0 && !localGame.hitCells.has(`${i}-${j}`)) {
-            const el = document.getElementById(`cell-${i}-${j}`);
-            if (el) el.className = 'cell revealed';
-          }
-        }
-      }
-    }
-
-    function updateDisplay() {
-      document.getElementById('scoreDisplay').innerText = localGame.score;
-      document.getElementById('shotsDisplay').innerText = localGame.maxShots - localGame.shots;
-      document.getElementById('shipsDisplay').innerText = 10 - destroyedShips.size;
-    }
-
-    function updateFleetStatus() {
-      const fleet = document.getElementById('fleetStatus');
-      const sizes = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1];
-      fleet.innerHTML = sizes.map((s, i) => {
-        const dead = destroyedShips.has(i + 1) ? 'destroyed' : '';
-        return `<div class="ship-indicator ${dead}">${Array(s).fill('<div class="ship-segment"></div>').join('')}</div>`;
-      }).join('');
-    }
-
-    function setMessage(m) { document.getElementById('messageBar').innerText = m; }
-    
-    function returnToMenu() { 
-      document.getElementById('startScreen').style.display = 'block'; 
-      document.getElementById('gameScreen').style.display = 'none'; 
-      localGame = null; 
-    }
-    
-    // ─── ОТОБРАЖЕНИЕ РЕКОРДОВ ───
-    async function showScores() {
-      const container = document.getElementById('scoresContainer');
-      
-      // Сначала загружаем из памяти телефона
-      let scores = JSON.parse(localStorage.getItem('seabattle_scores') || '[]');
-
-      // Попытка получить с BTP
-      try {
-        const res = await fetch('/api/HighScores?$orderby=score desc&$top=10');
-        const data = await res.json();
-        if (data.value && data.value.length) {
-          scores = data.value.map(s => ({ name: s.playerName, score: s.score, shots: s.shots }));
-        }
-      } catch(e){}
-
-      if (scores.length > 0) {
-        container.innerHTML = `
-          <table class="scores-table">
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>ИМЯ</th>
-                <th>ОЧКИ</th>
-                <th>ВЫСТРЕЛЫ</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${scores.map((s, i) => `
-                <tr>
-                  <td>${i + 1}</td>
-                  <td>${s.name}</td>
-                  <td>${s.score}</td>
-                  <td>${s.shots}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>`;
-      } else {
-        container.innerHTML = '<p style="text-align:center; padding:10px;">Пока нет рекордов. Сыграйте первую игру!</p>';
-      }
-    }
-  </script>
-</body>
-</html>
+      let scores = 
