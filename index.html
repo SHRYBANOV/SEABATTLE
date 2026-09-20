@@ -442,4 +442,96 @@
     }
 
     function finishGame() {
-      let scores = 
+      let scores = JSON.parse(localStorage.getItem('seabattle_scores') || '[]');
+      scores.push({
+        name: localGame.name,
+        score: localGame.score,
+        shots: localGame.shots
+      });
+      scores.sort((a, b) => b.score - a.score);
+      scores = scores.slice(0, 10);
+      localStorage.setItem('seabattle_scores', JSON.stringify(scores));
+
+      const id = 'id' + Date.now();
+      fetch('/api/HighScores', {
+        method: 'POST', 
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ ID: id, playerName: localGame.name, score: localGame.score, shots: localGame.shots, playedAt: new Date().toISOString() })
+      }).catch(()=>{});
+    }
+
+    function reveal() {
+      for (let i = 0; i < 10; i++) {
+        for (let j = 0; j < 10; j++) {
+          if (localGame.grid[i][j] > 0 && !localGame.hitCells.has(`${i}-${j}`)) {
+            const el = document.getElementById(`cell-${i}-${j}`);
+            if (el) el.className = 'cell revealed';
+          }
+        }
+      }
+    }
+
+    function updateDisplay() {
+      document.getElementById('scoreDisplay').innerText = localGame.score;
+      document.getElementById('shotsDisplay').innerText = localGame.maxShots - localGame.shots;
+      document.getElementById('shipsDisplay').innerText = 10 - destroyedShips.size;
+    }
+
+    function updateFleetStatus() {
+      const fleet = document.getElementById('fleetStatus');
+      const sizes = [4, 3, 3, 2, 2, 2, 1, 1, 1, 1];
+      fleet.innerHTML = sizes.map((s, i) => {
+        const dead = destroyedShips.has(i + 1) ? 'destroyed' : '';
+        return `<div class="ship-indicator ${dead}">${Array(s).fill('<div class="ship-segment"></div>').join('')}</div>`;
+      }).join('');
+    }
+
+    function setMessage(m) { document.getElementById('messageBar').innerText = m; }
+    
+    function returnToMenu() { 
+      document.getElementById('startScreen').style.display = 'block'; 
+      document.getElementById('gameScreen').style.display = 'none'; 
+      localGame = null; 
+    }
+    
+    async function showScores() {
+      const container = document.getElementById('scoresContainer');
+      let scores = JSON.parse(localStorage.getItem('seabattle_scores') || '[]');
+
+      try {
+        const res = await fetch('/api/HighScores?$orderby=score desc&$top=10');
+        const data = await res.json();
+        if (data.value && data.value.length) {
+          scores = data.value.map(s => ({ name: s.playerName, score: s.score, shots: s.shots }));
+        }
+      } catch(e){}
+
+      if (scores.length > 0) {
+        container.innerHTML = `
+          <table class="scores-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>ИМЯ</th>
+                <th>ОЧКИ</th>
+                <th>ВЫСТРЕЛЫ</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${scores.map((s, i) => `
+                <tr>
+                  <td>${i + 1}</td>
+                  <td>${s.name}</td>
+                  <td>${s.score}</td>
+                  <td>${s.shots}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>`;
+      } else {
+        container.innerHTML = '<p style="text-align:center; padding:10px;">Пока нет рекордов. Сыграйте первую игру!</p>';
+      }
+    }
+  </script>
+</body>
+</html>
